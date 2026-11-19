@@ -1,0 +1,24 @@
+# Virtual Environment
+venv/
+.env
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Application Storage and Databases
+video.db
+video.db-journal
+chroma_db/
+storage/
+uploads/
+
+# Model Caches and Weights
+model/clip_cache/
+model/torch_cache/
+model/weights/
+model/sample_surveillance.jpg
+Ultralytics/
+.ultralytics/
+runs/
