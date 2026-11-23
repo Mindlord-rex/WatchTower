@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Player: {{ video.filename }} - WatchTower{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Top Back and Breadcrumbs -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <a href="/library" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+            </a>
+            <div>
+                <h1 class="text-xl font-bold text-white truncate max-w-xl">{{ video.filename }}</h1>
+                <p class="text-xs text-gray-400">
+                    Duration: {{ "%.1f"|format(video.duration) }}s &bull; 
+                    FPS: {{ "%.0f"|format(video.fps) }} &bull; 
+                    Resolution: {{ video.width }}x{{ video.height }} &bull; 
+                    Detections: {{ video.detection_count }}
+                </p>
+            </div>
+        </div>
+        <div>
+            <a href="/search?video_id={{ video.id }}" class="inline-flex items-center px-3.5 py-2 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm transition">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Search In This Video
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Layout: Player on Left, Detections Timeline on Right -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Video Player Column (2 Cols) -->
+        <div class="lg:col-span-2 space-y-4">
+            <!-- Native HTML5 Video Element (Completely JavaScript-Free) -->
+            <div class="bg-black rounded-2xl overflow-hidden border border-gray-800 shadow-2xl relative">
+                <video id="surveillance-player"
+                       controls 
+                       autoplay 
+                       playsinline
+                       preload="metadata"
+                       class="w-full aspect-video bg-black"
+                       src="/videos/{{ video.id }}/stream#t={{ current_timestamp }}">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+
+            <!-- Current Playback Position Info -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
+                        Target Time: {{ formatted_timestamp }}
+                    </span>
+                    <span class="text-xs text-gray-400">
+                        Browser URL Fragment: <code class="text-gray-300 font-mono">#t={{ current_timestamp }}</code>
+                    </span>
+                </div>
+                <div class="text-xs text-gray-500">
+                    Native HTML5 Video Seeking Enabled
+                </div>
+            </div>
+        </div>
+
+        <!-- Detected Persons Timeline Column (1 Col) -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col h-[650px] shadow-xl">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+                <h2 class="text-sm font-bold text-white flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-cyan-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                    </svg>
+                    Detected Persons ({{ detections|length }})
+                </h2>
+                <span class="text-xs text-gray-400 font-mono">Click to Jump</span>
+            </div>
+
+            <!-- Scrollable Detection List -->
+            <div class="overflow-y-auto flex-grow mt-3 space-y-2 pr-1">
+                {% if detections and detections|length > 0 %}
+                    {% for det in detections %}
+                    <a href="/videos/{{ video.id }}/player?t={{ det.timestamp }}" 
+                       class="flex items-center space-x-3 p-2.5 rounded-xl border {% if det.timestamp == current_timestamp %}bg-cyan-950/40 border-cyan-500/70 text-white{% else %}bg-gray-950/40 border-gray-800 hover:border-gray-700 hover:bg-gray-800/50 text-gray-300{% endif %} transition group">
+                        
+                        <!-- Person Crop Thumbnail -->
+                        <div class="w-12 h-14 rounded-lg bg-black border border-gray-700 overflow-hidden flex-shrink-0">
+                            <img src="/{{ det.crop_path }}" alt="Crop" class="w-full h-full object-cover">
+                        </div>
+
+                        <!-- Detection Details -->
+                        <div class="flex-grow min-w-0">
+                            <div class="flex items-center justify-between">
+                                <span class="font-mono text-xs font-bold text-cyan-400 group-hover:text-cyan-300">
+                                    ⏱️ {{ det.timestamp_formatted }}
+                                </span>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
+                                    Frame #{{ det.frame_number }}
+                                </span>
+                            </div>
+                            <div class="mt-1 flex items-center justify-between text-[11px] text-gray-400">
+                                <span>Conf: <strong class="text-emerald-400">{{ "%.2f"|format(det.confidence) }}</strong></span>
+                                <span class="text-gray-500">Box [{{ det.bbox_x1 }}, {{ det.bbox_y1 }}, {{ det.bbox_x2 }}, {{ det.bbox_y2 }}]</span>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-12 text-xs text-gray-500">
+                        No person detections recorded for this video.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

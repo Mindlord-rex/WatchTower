@@ -1,0 +1,131 @@
+{# Partial for search results grid #}
+{% if results and results|length > 0 %}
+<div class="mb-4 flex items-center justify-between">
+    <p class="text-sm text-gray-400">
+        Found <span class="font-bold text-cyan-400">{{ results|length }}</span> matching detections for: 
+        <strong class="text-white">"{{ query }}"</strong>
+    </p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    {% for item in results %}
+    <div class="bg-gray-900 border border-gray-800 hover:border-cyan-500/50 rounded-xl overflow-hidden shadow-lg transition flex flex-col group">
+        <!-- Frame Thumbnail with Highlighted Person Box -->
+        <div class="relative bg-black aspect-video overflow-hidden">
+            <a href="/videos/{{ item.video_id }}/player?t={{ item.timestamp }}" 
+               title="Click to jump to {{ item.timestamp_formatted }} in video"
+               class="block w-full h-full">
+                <img src="/{{ item.frame_path }}" 
+                     alt="Detection Frame at {{ item.timestamp_formatted }}" 
+                     class="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
+                     loading="lazy">
+                
+                <!-- Overlay badge for Play on Hover -->
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition duration-200">
+                    <span class="inline-flex items-center px-3 py-1.5 rounded-full bg-cyan-600 text-white text-xs font-semibold shadow-lg">
+                        <svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                        </svg>
+                        Play at {{ item.timestamp_formatted }}
+                    </span>
+                </div>
+            </a>
+
+            <!-- Similarity Score Pill -->
+            <div class="absolute top-2 right-2">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold shadow-md
+                    {% if item.similarity_pct >= 80 %}
+                        bg-emerald-600/90 text-white
+                    {% elif item.similarity_pct >= 60 %}
+                        bg-cyan-600/90 text-white
+                    {% else %}
+                        bg-amber-600/90 text-white
+                    {% endif %}">
+                    {{ item.similarity_pct }}% match
+                </span>
+            </div>
+
+            <!-- Timestamp Pill -->
+            <div class="absolute bottom-2 left-2">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-black/80 text-gray-200 border border-gray-700">
+                    <svg class="w-3 h-3 mr-1 text-cyan-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                    </svg>
+                    {{ item.timestamp_formatted }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Detection Card Details -->
+        <div class="p-4 flex flex-col justify-between flex-grow">
+            <div>
+                <!-- Source Video Filename -->
+                <div class="flex items-center justify-between text-xs text-gray-400 mb-2">
+                    <span class="truncate font-medium text-gray-300" title="{{ item.video_filename }}">
+                        📹 {{ item.video_filename }}
+                    </span>
+                    <span class="text-gray-500 font-mono">Frame #{{ item.frame_number }}</span>
+                </div>
+
+                <div class="flex items-center space-x-3 mb-3">
+                    <!-- Person Crop preview -->
+                    <div class="w-12 h-16 rounded border border-gray-700 overflow-hidden bg-black flex-shrink-0">
+                        <img src="/{{ item.crop_path }}" alt="Person Crop" class="w-full h-full object-cover">
+                    </div>
+
+                    <div class="text-xs text-gray-400 space-y-1">
+                        <div>Detection Conf: <strong class="text-emerald-400 font-mono">{{ "%.2f"|format(item.confidence) }}</strong></div>
+                        <div>Cosine Sim: <span class="text-cyan-400 font-mono">{{ "%.3f"|format(item.similarity) }}</span></div>
+                        <div class="text-gray-500">Box: [{{ item.bbox[0] }}, {{ item.bbox[1] }}, {{ item.bbox[2] }}, {{ item.bbox[3] }}]</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Direct Jump Link -->
+            <div class="pt-3 border-t border-gray-800 flex items-center justify-between">
+                <a href="/videos/{{ item.video_id }}/player?t={{ item.timestamp }}" 
+                   class="w-full text-center inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 hover:bg-cyan-600 text-gray-200 hover:text-white transition">
+                    <svg class="w-3.5 h-3.5 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                    </svg>
+                    Jump to {{ item.timestamp_formatted }}
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% elif query %}
+<div class="text-center py-16 bg-gray-900 border border-gray-800 rounded-2xl p-8">
+    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-white mb-2">No matching detections found</h3>
+    <p class="text-sm text-gray-400 max-w-md mx-auto mb-6">
+        No person detections matched "<span class="text-gray-200">{{ query }}</span>". 
+        Try describing clothing items, colors, accessories, or actions.
+    </p>
+    <div class="flex flex-wrap items-center justify-center gap-2">
+        <span class="text-xs text-gray-500">Suggestions:</span>
+        <button type="button" 
+                hx-post="/search" 
+                hx-vals='{"query": "person wearing a red jacket", "top_k": 12}' 
+                hx-target="#search-results" 
+                hx-indicator="#search-spinner"
+                class="px-2.5 py-1 rounded-md text-xs bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-gray-700">
+            "Person wearing a red jacket"
+        </button>
+        <button type="button" 
+                hx-post="/search" 
+                hx-vals='{"query": "man with backpack", "top_k": 12}' 
+                hx-target="#search-results" 
+                hx-indicator="#search-spinner"
+                class="px-2.5 py-1 rounded-md text-xs bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-gray-700">
+            "Man with backpack"
+        </button>
+    </div>
+</div>
+{% endif %}

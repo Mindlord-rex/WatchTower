@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Semantic Person Search - WatchTower{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Search Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-white tracking-tight">Semantic Person Search</h1>
+        <p class="text-sm text-gray-400 mt-1">
+            Search across surveillance recordings using free-form natural language queries powered by CLIP text-to-image embeddings.
+        </p>
+    </div>
+
+    <!-- Search Form Bar -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
+        <form hx-post="/search" 
+              hx-target="#search-results" 
+              hx-indicator="#search-spinner" 
+              class="space-y-4">
+            
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-grow">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <input type="text" 
+                           id="search-input"
+                           name="query" 
+                           value="{{ initial_query }}" 
+                           placeholder="Describe person (e.g., 'person wearing a red jacket', 'man carrying backpack')..." 
+                           required
+                           class="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-base text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 shadow-inner">
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <!-- Results limit -->
+                    <select name="top_k" 
+                            class="py-3 px-3 bg-gray-800 border border-gray-700 rounded-xl text-sm text-gray-300 focus:outline-none focus:border-cyan-500" 
+                            title="Number of results">
+                        <option value="6">6 results</option>
+                        <option value="12" selected>12 results</option>
+                        <option value="24">24 results</option>
+                        <option value="48">48 results</option>
+                    </select>
+
+                    <!-- Filter by video -->
+                    <select name="video_id" 
+                            class="py-3 px-3 bg-gray-800 border border-gray-700 rounded-xl text-sm text-gray-300 focus:outline-none focus:border-cyan-500" 
+                            title="Filter by video">
+                        <option value="">All Videos</option>
+                        {% for v in videos %}
+                        <option value="{{ v.id }}" {% if selected_video_id == v.id %}selected{% endif %}>
+                            {{ v.filename[:25] }}{% if v.filename|length > 25 %}...{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+
+                    <button type="submit" 
+                            class="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-cyan-600/20 flex items-center justify-center">
+                        Search
+                    </button>
+                </div>
+            </div>
+
+            <!-- Example Query Badges (Standard HTML button forms without custom JS) -->
+            <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-800/80">
+                <span class="text-xs text-gray-500">Quick queries:</span>
+                <button type="button" 
+                        hx-post="/search" 
+                        hx-vals='{"query": "person wearing a red jacket", "top_k": 12, "video_id": "{{ selected_video_id }}"}' 
+                        hx-target="#search-results" 
+                        hx-indicator="#search-spinner"
+                        class="px-2.5 py-1 rounded-md text-xs bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-gray-700 transition">
+                    "Person wearing a red jacket"
+                </button>
+                <button type="button" 
+                        hx-post="/search" 
+                        hx-vals='{"query": "man carrying a black backpack", "top_k": 12, "video_id": "{{ selected_video_id }}"}' 
+                        hx-target="#search-results" 
+                        hx-indicator="#search-spinner"
+                        class="px-2.5 py-1 rounded-md text-xs bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-gray-700 transition">
+                    "Man carrying a black backpack"
+                </button>
+                <button type="button" 
+                        hx-post="/search" 
+                        hx-vals='{"query": "person wearing a white shirt and blue jeans", "top_k": 12, "video_id": "{{ selected_video_id }}"}' 
+                        hx-target="#search-results" 
+                        hx-indicator="#search-spinner"
+                        class="px-2.5 py-1 rounded-md text-xs bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-gray-700 transition">
+                    "White shirt and blue jeans"
+                </button>
+                <button type="button" 
+                        hx-post="/search" 
+                        hx-vals='{"query": "someone walking with a suitcase", "top_k": 12, "video_id": "{{ selected_video_id }}"}' 
+                        hx-target="#search-results" 
+                        hx-indicator="#search-spinner"
+                        class="px-2.5 py-1 rounded-md text-xs bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-gray-700 transition">
+                    "Walking with a suitcase"
+                </button>
+                <button type="button" 
+                        hx-post="/search" 
+                        hx-vals='{"query": "person wearing a helmet", "top_k": 12, "video_id": "{{ selected_video_id }}"}' 
+                        hx-target="#search-results" 
+                        hx-indicator="#search-spinner"
+                        class="px-2.5 py-1 rounded-md text-xs bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-gray-700 transition">
+                    "Person wearing a helmet"
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Loading Spinner (Shown only during HTMX requests) -->
+    <div id="search-spinner" class="htmx-indicator py-8 text-center">
+        <div class="inline-flex items-center space-x-3 px-5 py-2.5 rounded-full bg-gray-900 border border-gray-800 shadow-xl">
+            <svg class="animate-spin w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-xs text-gray-300 font-medium">Encoding text query & matching ChromaDB vectors...</span>
+        </div>
+    </div>
+
+    <!-- Search Results Container -->
+    <div id="search-results">
+        {% if initial_results is defined %}
+            {% set results = initial_results %}
+            {% set query = initial_query %}
+            {% include "partials/search_results.html" %}
+        {% else %}
+        <div class="text-center py-16 bg-gray-900 border border-gray-800 rounded-2xl p-8">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-cyan-400">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-white mb-2">Natural-Language Search Ready</h3>
+            <p class="text-sm text-gray-400 max-w-lg mx-auto">
+                Type any physical description, apparel, color, or accessory in the search bar above to instantly retrieve matching frames across your surveillance videos.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

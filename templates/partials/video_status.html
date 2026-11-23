@@ -1,0 +1,108 @@
+{# Partial for single video status card / row component #}
+<div id="video-card-{{ video.id }}" 
+     class="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-700 transition"
+     {% if video.status == 'PROCESSING' or video.status == 'UPLOADED' %}
+     hx-get="/videos/{{ video.id }}/status" 
+     hx-trigger="every 2s" 
+     hx-swap="outerHTML"
+     {% endif %}>
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-start space-x-4">
+            <div class="w-12 h-12 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-base font-semibold text-white truncate max-w-md" title="{{ video.filename }}">
+                    {{ video.filename }}
+                </h3>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-400">
+                    <span>ID: <code class="text-gray-300 font-mono">{{ video.id[:8] }}</code></span>
+                    {% if video.duration > 0 %}
+                    <span>&bull; {{ "%.1f"|format(video.duration) }}s</span>
+                    {% endif %}
+                    {% if video.fps > 0 %}
+                    <span>&bull; {{ "%.0f"|format(video.fps) }} FPS</span>
+                    {% endif %}
+                    {% if video.total_frames > 0 %}
+                    <span>&bull; {{ video.total_frames }} frames</span>
+                    {% endif %}
+                    <span>&bull; {{ video.created_at }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <!-- Status Badge -->
+            {% if video.status == 'COMPLETED' %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+                <svg class="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                Completed ({{ video.detection_count }} detections)
+            </span>
+            {% elif video.status == 'PROCESSING' %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-cyan-950 text-cyan-400 border border-cyan-800">
+                <svg class="w-3 h-3 mr-1.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing ({{ video.progress }}%)
+            </span>
+            {% elif video.status == 'FAILED' %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-rose-950 text-rose-400 border border-rose-800" title="{{ video.error_message }}">
+                <svg class="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
+                Failed
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
+                Uploaded
+            </span>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="flex items-center space-x-2">
+                {% if video.status == 'COMPLETED' %}
+                <a href="/videos/{{ video.id }}/player" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                    </svg>
+                    Play
+                </a>
+                <a href="/search?video_id={{ video.id }}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700">
+                    Search
+                </a>
+                {% endif %}
+
+                <!-- Delete Form (Standard HTML form, no JS) -->
+                <form action="/videos/{{ video.id }}/delete" method="POST" onsubmit="return confirm('Are you sure you want to delete this video and all indexed embeddings?');" class="inline">
+                    <button type="submit" class="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-800/80 hover:bg-rose-900/60 text-gray-400 hover:text-rose-300 border border-gray-700 hover:border-rose-700 transition" title="Delete video">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Progress Bar when processing -->
+    {% if video.status == 'PROCESSING' %}
+    <div class="mt-4 pt-3 border-t border-gray-800">
+        <div class="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+            <span>Detecting persons with YOLOv8 & generating CLIP embeddings...</span>
+            <span class="font-mono text-cyan-400 font-semibold">{{ video.progress }}%</span>
+        </div>
+        <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+            <div class="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full transition-all duration-300" style="width: {{ video.progress }}%"></div>
+        </div>
+    </div>
+    {% elif video.status == 'FAILED' and video.error_message %}
+    <div class="mt-3 p-2.5 rounded bg-rose-950/40 border border-rose-900/60 text-xs text-rose-300">
+        <strong>Error:</strong> {{ video.error_message }}
+    </div>
+    {% endif %}
+</div>
