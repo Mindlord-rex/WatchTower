@@ -276,37 +276,71 @@ def download_and_process_url_pipeline(
 
     try:
         import yt_dlp
+        from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+
+        # Merging separate video/audio streams (what YouTube and most sites serve)
+        # requires ffmpeg; without it yt-dlp aborts the whole download. Prefer a
+        # system ffmpeg, otherwise fall back to the binary bundled by imageio-ffmpeg.
+        ffmpeg_location = None
+        ffmpeg_available = False
+        try:
+            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as probe_ydl:
+                ffmpeg_available = FFmpegPostProcessor(probe_ydl).available
+        except Exception:
+            ffmpeg_available = False
+        if not ffmpeg_available:
+            try:
+                import imageio_ffmpeg
+                bundled_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+                if bundled_ffmpeg and os.path.isfile(bundled_ffmpeg):
+                    ffmpeg_location = bundled_ffmpeg
+                    ffmpeg_available = True
+            except Exception:
+                pass
 
         # Output template prefixing with video_id
         out_template = str(config.UPLOAD_DIR / f"{video_id}_%(title).80B.%(ext)s")
 
         ydl_opts = {
             'outtmpl': out_template,
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'merge_output_format': 'mp4',
             'quiet': True,
             'no_warnings': True,
             'noplaylist': True,
         }
+        if ffmpeg_location:
+            ydl_opts['ffmpeg_location'] = ffmpeg_location
+        if ffmpeg_available:
+            ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best'
+            ydl_opts['merge_output_format'] = 'mp4'
+        else:
+            # Pre-merged (progressive) formats only; no post-processing possible
+            ydl_opts['format'] = 'best[ext=mp4]/best'
+            logger.warning(
+                "No ffmpeg found; downloading progressive formats only. "
+                "Install ffmpeg (or pip install imageio-ffmpeg) for full quality."
+            )
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             if info is None:
                 raise ValueError("Could not extract video information from the provided URL")
 
-            # Resolve actual downloaded file path
-            filename = ydl.prepare_filename(info)
-            base, _ = os.path.splitext(filename)
-            if os.path.exists(f"{base}.mp4"):
-                saved_file_path = f"{base}.mp4"
-            elif os.path.exists(filename):
-                saved_file_path = filename
-            else:
-                matches = list(config.UPLOAD_DIR.glob(f"{video_id}_*"))
-                if matches:
-                    saved_file_path = str(matches[0])
-                else:
+            # Resolve actual downloaded file path (post-merge, if a merge happened)
+            prepared = ydl.prepare_filename(info)
+            candidates = [info.get("filepath"), prepared, f"{os.path.splitext(prepared)[0]}.mp4"]
+            saved_file_path = next(
+                (p for p in candidates if p and os.path.isfile(p) and not p.endswith(".part")),
+                None
+            )
+            if not saved_file_path:
+                matches = [
+                    str(p) for p in config.UPLOAD_DIR.glob(f"{video_id}_*")
+                    if p.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".avi"}
+                    and not p.name.endswith(".part")
+                ]
+                if not matches:
                     raise FileNotFoundError("Downloaded video file could not be found on disk")
+                saved_file_path = max(matches, key=os.path.getmtime)
 
             title = info.get("title", Path(saved_file_path).name)
             if not title.lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
@@ -325,10 +359,13 @@ def download_and_process_url_pipeline(
 
     except Exception as e:
         logger.exception(f"Failed to download video from URL {url}: {e}")
+        message = f"Download failed: {str(e)}"
+        if 'ffmpeg is not installed' in str(e):
+            message += " (install ffmpeg or pip install imageio-ffmpeg)"
         update_video_progress(
             video_id=video_id,
             progress=0,
             status="FAILED",
-            error_message=f"Download failed: {str(e)}"
+            error_message=message
         )
 
