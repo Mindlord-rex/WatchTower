@@ -12,6 +12,7 @@ from src.models import get_model_manager
 from src.database import (
     update_video_progress,
     update_video_metadata,
+    update_video_file_info,
     save_detections_batch,
     get_video
 )
@@ -258,3 +259,76 @@ def delete_video_assets(video_id: str):
         shutil.rmtree(video_frames_dir, ignore_errors=True)
     if video_crops_dir.exists():
         shutil.rmtree(video_crops_dir, ignore_errors=True)
+
+
+def download_and_process_url_pipeline(
+    video_id: str,
+    url: str,
+    sampling_interval: int = config.DEFAULT_FRAME_INTERVAL,
+    conf_thresh: float = config.DEFAULT_CONF_THRESHOLD
+):
+    """
+    Downloads video from YouTube or a direct URL using yt-dlp, saves it to uploads/,
+    updates database metadata, and runs the YOLOv8 person detection & CLIP embedding pipeline.
+    """
+    logger.info(f"Starting URL download for video {video_id} from {url}")
+    update_video_progress(video_id, progress=1, status="DOWNLOADING")
+
+    try:
+        import yt_dlp
+
+        # Output template prefixing with video_id
+        out_template = str(config.UPLOAD_DIR / f"{video_id}_%(title).80B.%(ext)s")
+
+        ydl_opts = {
+            'outtmpl': out_template,
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'merge_output_format': 'mp4',
+            'quiet': True,
+            'no_warnings': True,
+            'noplaylist': True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info is None:
+                raise ValueError("Could not extract video information from the provided URL")
+
+            # Resolve actual downloaded file path
+            filename = ydl.prepare_filename(info)
+            base, _ = os.path.splitext(filename)
+            if os.path.exists(f"{base}.mp4"):
+                saved_file_path = f"{base}.mp4"
+            elif os.path.exists(filename):
+                saved_file_path = filename
+            else:
+                matches = list(config.UPLOAD_DIR.glob(f"{video_id}_*"))
+                if matches:
+                    saved_file_path = str(matches[0])
+                else:
+                    raise FileNotFoundError("Downloaded video file could not be found on disk")
+
+            title = info.get("title", Path(saved_file_path).name)
+            if not title.lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
+                title = f"{title}.mp4"
+
+        logger.info(f"Video {video_id} downloaded successfully to {saved_file_path}")
+        update_video_file_info(video_id=video_id, filename=title, file_path=saved_file_path)
+        update_video_progress(video_id, progress=5, status="PROCESSING")
+
+        # Automatically proceed to frame sampling, YOLOv8 detection & CLIP vectorization
+        process_video_pipeline(
+            video_id=video_id,
+            sampling_interval=sampling_interval,
+            conf_thresh=conf_thresh
+        )
+
+    except Exception as e:
+        logger.exception(f"Failed to download video from URL {url}: {e}")
+        update_video_progress(
+            video_id=video_id,
+            progress=0,
+            status="FAILED",
+            error_message=f"Download failed: {str(e)}"
+        )
+

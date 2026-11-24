@@ -19,6 +19,7 @@ The system retrieves the exact matching video frames across all uploaded surveil
 3. **HTTP 206 Range Streaming:** Enables sub-second native HTML5 `<video>` timestamp navigation (`#t=seconds`) without loading full video files into memory.
 4. **Persistent Vector & Relational Storage:** Uses persistent **ChromaDB** with cosine distance indexing for vector similarity and persistent **SQLite** for relational video and detection metadata with cascading deletions.
 5. **Memory-Conscious Stream Processing:** OpenCV sequentially samples frames at configurable intervals, avoiding loading multi-gigabyte video files into RAM.
+6. **Dual Ingestion (Local File + YouTube/URL):** Supports direct local file uploads (MP4, MOV, MKV) as well as asynchronous remote video ingestion from YouTube and web links via `yt-dlp`.
 
 ---
 

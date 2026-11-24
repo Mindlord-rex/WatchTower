@@ -6,6 +6,9 @@ WatchTower is a web application designed for surveillance footage analysis. It a
 
 ## Key Features
 
+- **Flexible Video Ingestion:**
+  - **Local Video Upload:** Drag-and-drop or select MP4, MOV, and MKV files.
+  - **YouTube & URL Import:** Download and index directly from YouTube URLs (`https://www.youtube.com/watch?v=...`) or remote video streams powered by `yt-dlp`.
 - **Semantic Person Search:** Search across all indexed videos using descriptive natural language (e.g., *"person wearing a red jacket"*, *"man carrying a black backpack"*, *"someone walking with a suitcase"*).
 - **Computer Vision Models:**
   - **YOLOv8n (PRW):** Fine-tuned specifically for person re-identification in surveillance footage (single-class person detector).
@@ -167,7 +170,10 @@ http://127.0.0.1:8000
 ## How It Works
 
 ### 1. Video Ingestion & Processing
-1. When a video (MP4, MOV, or MKV) is uploaded, it is saved under `uploads/` with a unique UUID.
+1. **Upload or Remote Import:**
+   - **Local File:** Uploaded directly through the browser interface.
+   - **YouTube / URL:** Ingested asynchronously from remote links using `yt-dlp`.
+   - The file is saved under `uploads/` with a unique UUID.
 2. An asynchronous background task launches `process_video_pipeline`.
 3. OpenCV reads frames sequentially according to the configurable `sampling_interval` (default: every 30 frames, ~1 frame per second).
 4. YOLOv8 detects person instances with scores above `conf_thresh` (default: 0.40).

@@ -24,6 +24,7 @@ def init_db():
             id TEXT PRIMARY KEY,
             filename TEXT NOT NULL,
             file_path TEXT NOT NULL,
+            original_url TEXT,
             status TEXT NOT NULL DEFAULT 'UPLOADED',
             progress INTEGER DEFAULT 0,
             total_frames INTEGER DEFAULT 0,
@@ -60,6 +61,12 @@ def init_db():
     c.execute("CREATE INDEX IF NOT EXISTS idx_detections_video_id ON detections(video_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_detections_embedding_id ON detections(embedding_id)")
 
+    # Ensure original_url column exists for upgraded databases
+    c.execute("PRAGMA table_info(videos)")
+    cols = [col[1] for col in c.fetchall()]
+    if "original_url" not in cols:
+        c.execute("ALTER TABLE videos ADD COLUMN original_url TEXT")
+
     conn.commit()
     conn.close()
     logger.info("Database initialized successfully.")
@@ -69,6 +76,8 @@ def create_video_record(
     video_id: str,
     filename: str,
     file_path: str,
+    original_url: Optional[str] = None,
+    status: str = "UPLOADED",
     sampling_interval: int = config.DEFAULT_FRAME_INTERVAL,
     total_frames: int = 0,
     fps: float = 0.0,
@@ -80,13 +89,22 @@ def create_video_record(
     c = conn.cursor()
     c.execute('''
         INSERT INTO videos (
-            id, filename, file_path, status, progress, total_frames,
+            id, filename, file_path, original_url, status, progress, total_frames,
             fps, duration, width, height, sampling_interval, detection_count
-        ) VALUES (?, ?, ?, 'UPLOADED', 0, ?, ?, ?, ?, ?, ?, 0)
-    ''', (video_id, filename, file_path, total_frames, fps, duration, width, height, sampling_interval))
+        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 0)
+    ''', (video_id, filename, file_path, original_url, status, total_frames, fps, duration, width, height, sampling_interval))
     conn.commit()
     conn.close()
     return get_video(video_id)
+
+
+def update_video_file_info(video_id: str, filename: str, file_path: str):
+    """Updates filename and file path after video is downloaded from remote URL."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE videos SET filename = ?, file_path = ? WHERE id = ?", (filename, file_path, video_id))
+    conn.commit()
+    conn.close()
 
 
 def update_video_progress(

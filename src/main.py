@@ -30,7 +30,11 @@ from src.database import (
     delete_video_record,
     get_db_connection
 )
-from src.video_processor import process_video_pipeline, delete_video_assets
+from src.video_processor import (
+    process_video_pipeline,
+    download_and_process_url_pipeline,
+    delete_video_assets
+)
 from src.search import semantic_person_search, format_timestamp
 from src.streaming import stream_video_file
 from src.models import get_model_manager
@@ -160,6 +164,51 @@ async def handle_video_upload(
     )
 
     # Redirect directly to video library to view live progress
+    return RedirectResponse(url="/library", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/upload/url")
+async def handle_url_upload(
+    background_tasks: BackgroundTasks,
+    url: str = Form(...),
+    sampling_interval: int = Form(config.DEFAULT_FRAME_INTERVAL),
+    conf_thresh: float = Form(config.DEFAULT_CONF_THRESHOLD)
+):
+    """
+    Handles video import from YouTube or direct video URL,
+    registers database entry with 'DOWNLOADING' status, and dispatches
+    background download & processing pipeline.
+    """
+    clean_url = url.strip()
+    if not clean_url or not clean_url.startswith(("http://", "https://")) or len(clean_url) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail="Please enter a valid HTTP/HTTPS video URL (e.g., YouTube link)"
+        )
+
+    video_id = str(uuid.uuid4())
+    placeholder_filename = "Importing remote video..."
+    placeholder_filepath = str(config.UPLOAD_DIR / f"{video_id}_pending.mp4")
+
+    # Create SQLite record with DOWNLOADING state
+    create_video_record(
+        video_id=video_id,
+        filename=placeholder_filename,
+        file_path=placeholder_filepath,
+        original_url=clean_url,
+        status="DOWNLOADING",
+        sampling_interval=sampling_interval
+    )
+
+    # Dispatch background downloader & processor
+    background_tasks.add_task(
+        download_and_process_url_pipeline,
+        video_id=video_id,
+        url=clean_url,
+        sampling_interval=sampling_interval,
+        conf_thresh=conf_thresh
+    )
+
     return RedirectResponse(url="/library", status_code=status.HTTP_303_SEE_OTHER)
 
 
